@@ -90,13 +90,13 @@ echo -e "${YELLOW}${BOLD}═══ SECTION 1: Static Code Analysis (Eval: Check 
 
 # 1a — poll() used for I/O multiplexing
 echo -e "${CYAN}[1a] I/O Multiplexing function used:${NC}"
-if grep -q "poll(" src/WebServer.cpp; then
+if grep -q "poll(" src/core/WebServer.cpp; then
     pass "I/O multiplexing: poll() detected in WebServer.cpp"
-elif grep -q "select(" src/WebServer.cpp; then
+elif grep -q "select(" src/core/WebServer.cpp; then
     pass "I/O multiplexing: select() detected in WebServer.cpp"
-elif grep -q "epoll_wait(" src/WebServer.cpp; then
+elif grep -q "epoll_wait(" src/core/WebServer.cpp; then
     pass "I/O multiplexing: epoll detected in WebServer.cpp"
-elif grep -q "kevent(" src/WebServer.cpp; then
+elif grep -q "kevent(" src/core/WebServer.cpp; then
     pass "I/O multiplexing: kqueue detected in WebServer.cpp"
 else
     fail "No recognised I/O multiplexing function found"
@@ -104,7 +104,7 @@ fi
 
 # 1b — Single poll() call (must be one in the main loop)
 echo -e "${CYAN}[1b] Single poll() in the main loop:${NC}"
-POLL_CALL_COUNT=$(grep -c "poll(" src/WebServer.cpp)
+POLL_CALL_COUNT=$(grep -c "poll(" src/core/WebServer.cpp)
 if [ "$POLL_CALL_COUNT" -le 3 ]; then
     pass "Single poll() call verified ($POLL_CALL_COUNT match(es) including helper references)"
 else
@@ -113,7 +113,7 @@ fi
 
 # 1c — poll() checks read AND write at the same time
 echo -e "${CYAN}[1c] poll() monitors both read and write:${NC}"
-if grep -q "POLLIN" src/WebServer.cpp && grep -q "POLLOUT" src/WebServer.cpp; then
+if grep -q "POLLIN" src/core/WebServer.cpp && grep -q "POLLOUT" src/core/WebServer.cpp; then
     pass "poll() checks POLLIN and POLLOUT (read + write simultaneously)"
 else
     fail "poll() does not check both POLLIN and POLLOUT"
@@ -122,8 +122,8 @@ fi
 # 1d — recv/read return value checked for both -1 and 0
 echo -e "${CYAN}[1d] recv/read return value handles <= 0 (covers both -1 and 0):${NC}"
 # Check that after recv(), the code checks <= 0 (which handles both -1 error and 0 disconnect)
-RECV_CHECK=$(grep -A1 'recv(' src/WebServer.cpp | grep -c '<= 0')
-READ_CHECK=$(grep -A1 'read(' src/WebServer.cpp | grep -c '<= 0\|> 0\|< 0')
+RECV_CHECK=$(grep -A1 'recv(' src/core/WebServer.cpp | grep -c '<= 0')
+READ_CHECK=$(grep -A1 'read(' src/core/WebServer.cpp | grep -c '<= 0\|> 0\|< 0')
 TOTAL_IO_CHECK=$((RECV_CHECK + READ_CHECK))
 if [ "$TOTAL_IO_CHECK" -ge 2 ]; then
     pass "recv/read return values are properly checked ($TOTAL_IO_CHECK checks found)"
@@ -133,8 +133,8 @@ fi
 
 # 1e — send/write return value checked
 echo -e "${CYAN}[1e] send/write return value properly checked:${NC}"
-SEND_IO=$(grep -A1 'send(' src/WebServer.cpp | grep -c '<= 0')
-WRITE_IO=$(grep -A1 '\bwrite(' src/WebServer.cpp | grep -c '> 0\|< 0\|<= 0')
+SEND_IO=$(grep -A1 'send(' src/core/WebServer.cpp | grep -c '<= 0')
+WRITE_IO=$(grep -A1 '\bwrite(' src/core/WebServer.cpp | grep -c '> 0\|< 0\|<= 0')
 TOTAL_SEND_CHECK=$((SEND_IO + WRITE_IO))
 if [ "$TOTAL_SEND_CHECK" -ge 2 ]; then
     pass "send/write return values are properly checked ($TOTAL_SEND_CHECK checks found)"
@@ -149,15 +149,15 @@ echo -e "${CYAN}[1f] errno NOT checked after read/recv/write/send (CRITICAL):${N
 ERRNO_AFTER_IO=0
 while IFS= read -r linenum; do
     next=$((linenum + 1))
-    nextline=$(sed -n "${next}p" src/WebServer.cpp 2>/dev/null)
+    nextline=$(sed -n "${next}p" src/core/WebServer.cpp 2>/dev/null)
     if echo "$nextline" | grep -q "errno"; then
         ERRNO_AFTER_IO=1
         info "Line $next: $nextline"
     fi
-done < <(grep -n '\brecv\b\|\bsend\b' src/WebServer.cpp | grep -v "poll" | cut -d: -f1)
+done < <(grep -n '\brecv\b\|\bsend\b' src/core/WebServer.cpp | grep -v "poll" | cut -d: -f1)
 
 # Also check same-line errno after read/recv/write/send (exclude poll line)
-ERRNO_SAME_LINE=$(grep -n "errno" src/WebServer.cpp | grep -v "poll\|ready" | grep -E "\b(recv|send)\b" | wc -l)
+ERRNO_SAME_LINE=$(grep -n "errno" src/core/WebServer.cpp | grep -v "poll\|ready" | grep -E "\b(recv|send)\b" | wc -l)
 ERRNO_AFTER_IO=$((ERRNO_AFTER_IO + ERRNO_SAME_LINE))
 
 if [ "$ERRNO_AFTER_IO" -eq 0 ]; then
@@ -168,7 +168,7 @@ fi
 
 # 1g — On error from read/recv/write/send, client is removed
 echo -e "${CYAN}[1g] Client removed on I/O error:${NC}"
-if grep -A2 "recv\|send" src/WebServer.cpp | grep -q "closeClient"; then
+if grep -A2 "recv\|send" src/core/WebServer.cpp | grep -q "closeClient"; then
     pass "closeClient() is called when recv/send fails"
 else
     fail "Client may not be removed on I/O error"
@@ -282,7 +282,7 @@ check_status "eval3.com on port ${PORT2}" "http://eval3.com:${PORT2}/" "200" --r
 echo -e "${CYAN}[2b] Virtual hosting (different hostnames, same port):${NC}"
 HTML_EVAL1=$(curl -s --resolve eval1.com:${PORT1}:127.0.0.1 http://eval1.com:${PORT1}/ 2>/dev/null)
 HTML_EVAL2=$(curl -s --resolve eval2.com:${PORT1}:127.0.0.1 http://eval2.com:${PORT1}/ 2>/dev/null)
-if echo "$HTML_EVAL1" | grep -q "webserv is running" && echo "$HTML_EVAL2" | grep -q "Welcome to Eval2"; then
+if echo "$HTML_EVAL1" | grep -q "Webserv Dashboard" && echo "$HTML_EVAL2" | grep -q "Welcome to Eval2"; then
     pass "Virtual hosts: eval1.com and eval2.com return distinct content on port ${PORT1}"
 else
     fail "Virtual hosts: eval1.com and eval2.com did NOT return distinct content"
@@ -318,7 +318,7 @@ check_body_contains "GET /alt/ serves content from ./www/eval2 (contains 'Welcom
 echo -e "${CYAN}[2f] Default index file when requesting a directory:${NC}"
 check_status "GET / resolves to index.html → 200" "http://eval1.com:${PORT1}/" "200" --resolve eval1.com:${PORT1}:127.0.0.1
 check_body_contains "GET / serves index.html content" \
-    "http://eval1.com:${PORT1}/" "webserv is running" \
+    "http://eval1.com:${PORT1}/" "Webserv Dashboard" \
     --resolve eval1.com:${PORT1}:127.0.0.1
 
 # 2g — Methods accepted for route

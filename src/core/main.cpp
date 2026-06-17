@@ -1,5 +1,5 @@
-#include "Config.hpp"
-#include "WebServer.hpp"
+#include "config/Config.hpp"
+#include "core/WebServer.hpp"
 
 #include <iostream>
 #include <string>

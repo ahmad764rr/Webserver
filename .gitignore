@@ -14,3 +14,9 @@ cgi_tester
 .DS_Store
 *.swp
 
+# Test uploads and temp files
+www/upload/upload_*
+www/upload/uploaded_*
+temp_large.txt
+temp_small.txt
+upload_data.txt

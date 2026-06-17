@@ -1,4 +1,4 @@
-#include "CgiHandler.hpp"
+#include "cgi/CgiHandler.hpp"
 #include "http/HttpRequest.hpp"
 #include <iostream>
 #include <cstdlib>

@@ -8,47 +8,26 @@ SRC_DIR = src
 OBJ_DIR = build
 
 SRCS = \
-	$(SRC_DIR)/main.cpp \
-	$(SRC_DIR)/Config.cpp \
-	$(SRC_DIR)/WebServer.cpp \
-	$(SRC_DIR)/CgiHandler.cpp \
+	$(SRC_DIR)/core/main.cpp \
+	$(SRC_DIR)/core/WebServer.cpp \
+	$(SRC_DIR)/core/ClientConnection.cpp \
+	$(SRC_DIR)/config/Config.cpp \
+	$(SRC_DIR)/config/ConfigTypes.cpp \
 	$(SRC_DIR)/http/HttpRequest.cpp \
-	$(SRC_DIR)/http/HttpResponse.cpp
+	$(SRC_DIR)/http/HttpResponse.cpp \
+	$(SRC_DIR)/http/HttpHandler.cpp \
+	$(SRC_DIR)/cgi/CgiHandler.cpp \
+	$(SRC_DIR)/cgi/CgiManager.cpp \
+	$(SRC_DIR)/utils/FileUtils.cpp
 
-OBJS = \
-	$(OBJ_DIR)/main.o \
-	$(OBJ_DIR)/Config.o \
-	$(OBJ_DIR)/WebServer.o \
-	$(OBJ_DIR)/CgiHandler.o \
-	$(OBJ_DIR)/http/HttpRequest.o \
-	$(OBJ_DIR)/http/HttpResponse.o
+OBJS = $(SRCS:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 
 all: $(NAME)
 
 $(NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) $(OBJS) -o $(NAME)
 
-$(OBJ_DIR)/main.o: $(SRC_DIR)/main.cpp
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/Config.o: $(SRC_DIR)/Config.cpp
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/WebServer.o: $(SRC_DIR)/WebServer.cpp
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/CgiHandler.o: $(SRC_DIR)/CgiHandler.cpp
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/http/HttpRequest.o: $(SRC_DIR)/http/HttpRequest.cpp
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
-
-$(OBJ_DIR)/http/HttpResponse.o: $(SRC_DIR)/http/HttpResponse.cpp
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
 
