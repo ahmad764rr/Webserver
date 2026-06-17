@@ -1,0 +1,16 @@
+# Build artifacts
+*.o
+build/
+webserv
+test_cgi
+full_test
+tester
+cgi_tester
+
+# Logs
+*.log
+
+# Editor/system
+.DS_Store
+*.swp
+

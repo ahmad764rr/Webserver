@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Webserv Interactive Dashboard</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="dashboard">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1>Webserv UI</h1>
+        <p>Interactive HTTP Testing</p>
+      </div>
+      
+      <div class="nav-menu">
+        <div class="nav-item active" data-view="view-get">
+          <span class="nav-method method-get">GET</span> Static Files
+        </div>
+        <div class="nav-item" data-view="view-post">
+          <span class="nav-method method-post">POST</span> File Upload
+        </div>
+        <div class="nav-item" data-view="view-delete">
+          <span class="nav-method method-del">DEL</span> File Deletion
+        </div>
+        <div class="nav-item" data-view="view-cgi-get">
+          <span class="nav-method method-get">GET</span> CGI Script
+        </div>
+        <div class="nav-item" data-view="view-cgi-post">
+          <span class="nav-method method-post">POST</span> CGI Data
+        </div>
+        <div class="nav-item" data-view="view-errors">
+          <span class="nav-method method-err">ERR</span> Status Codes
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <div class="topbar">
+        <div class="url-bar">
+          <span class="url-bar-method" id="current-method">GET</span>
+          <input type="text" class="url-bar-input" id="current-url" value="/" readonly>
+        </div>
+      </div>
+
+      <div class="workspace">
+        <!-- Left Panel: Test Controls -->
+        <div class="panel-left">
+          <div class="panel-header" id="panel-title">Request Configuration</div>
+          <div class="panel-body">
+
+            <!-- 1. GET Static -->
+            <div id="view-get" class="view-section active fade-enter">
+              <div class="form-group">
+                <label>Resource Path</label>
+                <input type="text" id="get-path" class="input-field" value="/" placeholder="/styles.css or /errors/404.html">
+              </div>
+              <button class="btn" onclick="executeGet()">Send GET Request <span class="loading-spinner" id="spinner-get"></span></button>
+              
+              <div class="form-group" style="margin-top: 30px;">
+                <label>Test Directory Listing (Autoindex on port 8081)</label>
+                <button class="btn btn-secondary" onclick="executeAutoIndex()">Test Autoindex</button>
+              </div>
+            </div>
+
+            <!-- 2. POST Upload -->
+            <div id="view-post" class="view-section">
+              <div class="form-group">
+                <label>Upload Path</label>
+                <input type="text" id="upload-path" class="input-field" value="/upload/testfile.txt" placeholder="/upload/filename.ext">
+              </div>
+              <div class="form-group">
+                <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+                  <div class="drop-zone-text">Drag and drop a file here, or click to select</div>
+                  <input type="file" id="file-input" class="file-input">
+                  <div id="selected-file-name" style="color: var(--accent); font-weight: 600; margin-top: 10px;"></div>
+                </div>
+              </div>
+              <button class="btn" onclick="executeUpload()">Upload File <span class="loading-spinner" id="spinner-upload"></span></button>
+            </div>
+
+            <!-- 3. DELETE File -->
+            <div id="view-delete" class="view-section">
+              <div class="form-group">
+                <label>File to Delete</label>
+                <input type="text" id="delete-path" class="input-field" value="/upload/testfile.txt" placeholder="/upload/filename.ext">
+              </div>
+              <button class="btn btn-danger" onclick="executeDelete()">Send DELETE Request <span class="loading-spinner" id="spinner-delete"></span></button>
+            </div>
+
+            <!-- 4. CGI GET -->
+            <div id="view-cgi-get" class="view-section">
+              <div class="form-group">
+                <label>Query Parameters</label>
+                <input type="text" id="cgi-query" class="input-field" value="name=Ahmet&role=Evaluator" placeholder="key=value&foo=bar">
+              </div>
+              <button class="btn" onclick="executeCgiGet()">Execute CGI (GET) <span class="loading-spinner" id="spinner-cgi-get"></span></button>
+            </div>
+
+            <!-- 5. CGI POST -->
+            <div id="view-cgi-post" class="view-section">
+              <div class="form-group">
+                <label>POST Data (JSON or text)</label>
+                <textarea id="cgi-body" class="textarea-field" placeholder="Enter data to send to CGI">{"message": "Hello from the interactive dashboard!"}</textarea>
+              </div>
+              <button class="btn" onclick="executeCgiPost()">Execute CGI (POST) <span class="loading-spinner" id="spinner-cgi-post"></span></button>
+            </div>
+
+            <!-- 6. Errors -->
+            <div id="view-errors" class="view-section">
+              <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 20px;">Quickly test various HTTP responses.</p>
+              
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <button class="btn btn-secondary" onclick="testError('/not-found-page', 'GET')">Test 404 Not Found</button>
+                <button class="btn btn-secondary" onclick="testError('/', 'PUT')">Test 405 Method Not Allowed</button>
+                <button class="btn btn-secondary" onclick="testPayloadTooLarge()">Test 413 Payload Too Large (eval2.com)</button>
+                <button class="btn btn-secondary" onclick="testError('/cgi-bin/error_script.py', 'GET')">Test 502 Bad Gateway (CGI Error)</button>
+                <button class="btn btn-secondary" onclick="testError('/redirect/', 'GET')">Test 301 Redirect</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Right Panel: Terminal Viewer -->
+        <div class="panel-right">
+          <div class="panel-header">
+            <div>Response Inspector</div>
+            <div class="tabs">
+              <div class="tab active" onclick="switchResponseTab('raw')" id="tab-raw">Raw Terminal</div>
+              <div class="tab" onclick="switchResponseTab('preview')" id="tab-preview">Preview Render</div>
+            </div>
+          </div>
+          <div class="panel-body" style="padding: 0; background: #000;">
+            <div class="terminal" id="term-container">
+              <div style="color: #64748b; font-style: italic;">// Waiting for request...</div>
+            </div>
+            <div class="rendered-html" id="preview-container" style="display: none;">
+               <!-- Rendered HTML will appear here -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
