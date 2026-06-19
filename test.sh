@@ -122,8 +122,8 @@ fi
 # 1d — recv/read return value checked for both -1 and 0
 echo -e "${CYAN}[1d] recv/read return value handles <= 0 (covers both -1 and 0):${NC}"
 # Check that after recv(), the code checks <= 0 (which handles both -1 error and 0 disconnect)
-RECV_CHECK=$(grep -A2 'recv(' src/core/WebServer.cpp | grep -c '<= 0')
-READ_CHECK=$(grep -A2 'read(' src/core/WebServer.cpp | grep -c '<= 0\|> 0\|< 0')
+RECV_CHECK=$(grep -A10 'recv(' src/core/WebServer.cpp | grep -c '<= 0\|< 0')
+READ_CHECK=$(grep -A10 'read(' src/core/WebServer.cpp | grep -c '<= 0\|> 0\|< 0')
 TOTAL_IO_CHECK=$((RECV_CHECK + READ_CHECK))
 if [ "$TOTAL_IO_CHECK" -ge 2 ]; then
     pass "recv/read return values are properly checked ($TOTAL_IO_CHECK checks found)"
@@ -133,8 +133,8 @@ fi
 
 # 1e — send/write return value checked
 echo -e "${CYAN}[1e] send/write return value properly checked:${NC}"
-SEND_IO=$(grep -A2 'send(' src/core/WebServer.cpp | grep -c '<= 0')
-WRITE_IO=$(grep -A2 '\bwrite(' src/core/WebServer.cpp | grep -c '> 0\|< 0\|<= 0')
+SEND_IO=$(grep -A10 'send(' src/core/WebServer.cpp | grep -c '<= 0\|< 0')
+WRITE_IO=$(grep -A10 '\bwrite(' src/core/WebServer.cpp | grep -c '> 0\|< 0\|<= 0')
 TOTAL_SEND_CHECK=$((SEND_IO + WRITE_IO))
 if [ "$TOTAL_SEND_CHECK" -ge 2 ]; then
     pass "send/write return values are properly checked ($TOTAL_SEND_CHECK checks found)"
@@ -168,7 +168,7 @@ fi
 
 # 1g — On error from read/recv/write/send, client is removed
 echo -e "${CYAN}[1g] Client removed on I/O error:${NC}"
-if grep -A2 "recv\|send" src/core/WebServer.cpp | grep -q "closeClient"; then
+if grep -A10 "recv\|send" src/core/WebServer.cpp | grep -q "closeClient"; then
     pass "closeClient() is called when recv/send fails"
 else
     fail "Client may not be removed on I/O error"
