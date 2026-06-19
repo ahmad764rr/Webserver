@@ -1,7 +1,7 @@
 #include "config/ConfigTypes.hpp"
 
 LocationConfig::LocationConfig()
-    : redirect(0, ""), autoindex(false), uploadEnable(false) {
+    : redirect(0, ""), autoindex(-1), uploadEnable(false) {
 }
 
 ServerConfig::ServerConfig()

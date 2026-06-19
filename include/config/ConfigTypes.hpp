@@ -10,7 +10,7 @@ struct LocationConfig {
     std::vector<std::string> allowedMethods;
     std::pair<int, std::string> redirect;
     std::string root;
-    bool autoindex;
+    int autoindex;
     std::string index;
     bool uploadEnable;
     std::string uploadDir;

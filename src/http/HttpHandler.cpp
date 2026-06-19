@@ -172,7 +172,8 @@ void buildResponseForRequest(ClientConnection& client, const std::vector<ServerC
 
     if (FileUtils::isDirectory(resolvedPath)) {
         std::string indexFile = (location && !location->index.empty()) ? location->index : "";
-        if (indexFile.empty() && (!location || !location->autoindex) && !cfg.autoindex) {
+        bool autoindexActive = (location && location->autoindex != -1) ? (location->autoindex == 1) : cfg.autoindex;
+        if (indexFile.empty() && !autoindexActive) {
             indexFile = "index.html";
         }
 
@@ -188,7 +189,6 @@ void buildResponseForRequest(ClientConnection& client, const std::vector<ServerC
         }
 
         if (!indexFound) {
-            bool autoindexActive = location ? location->autoindex : cfg.autoindex;
             if (autoindexActive) {
                 std::string listingBody;
                 if (FileUtils::generateAutoIndex(resolvedPath, request.getPath(), listingBody)) {
