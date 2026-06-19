@@ -146,6 +146,16 @@ void buildResponseForRequest(ClientConnection& client, const std::vector<ServerC
     std::string resolvedPath = resolvePath(cfg, location, locationMatchedPath, request.getPath());
     if (resolvedPath.empty()) { buildErrorResponse(client, servers, 403, "Forbidden path access detected"); return; }
 
+    if (FileUtils::isDirectory(resolvedPath)) {
+        const std::string& path = request.getPath();
+        if (path.empty() || path[path.size() - 1] != '/') {
+            client.response.setStatusCode(301);
+            client.response.setHeader("location", path + "/");
+            client.response.prepare();
+            return;
+        }
+    }
+
     std::string ext;
     if (CgiManager::shouldUseCgi(cfg, location, request, ext)) {
         if (!CgiManager::setupCgiTask(cfg, location, locationMatchedPath, client, ext)) {
