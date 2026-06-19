@@ -182,7 +182,7 @@ void WebServer::handleCgiWrite(int clientFd) {
         std::size_t remaining = body.size() - client.cgiTask.body_written;
         const ssize_t wrote = write(client.cgiTask.pipe_in_fd, body.data() + client.cgiTask.body_written, remaining);
         if (wrote > 0) client.cgiTask.body_written += static_cast<std::size_t>(wrote);
-        else if (wrote < 0) { close(client.cgiTask.pipe_in_fd); client.cgiTask.pipe_in_fd = -1; }
+        else if (wrote < 0 && errno != EAGAIN && errno != EWOULDBLOCK) { close(client.cgiTask.pipe_in_fd); client.cgiTask.pipe_in_fd = -1; }
     }
     if (client.cgiTask.body_written >= client.cgiTask.body_to_write.size()) {
         if (client.cgiTask.pipe_in_fd != -1) { close(client.cgiTask.pipe_in_fd); client.cgiTask.pipe_in_fd = -1; }
@@ -197,6 +197,7 @@ void WebServer::handleCgiRead(int clientFd) {
     char buffer[4096];
     const ssize_t n = read(client.cgiTask.pipe_out_fd, buffer, sizeof(buffer));
     if (n > 0) client.cgiTask.cgi_output.append(buffer, static_cast<std::size_t>(n));
+    else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return;
     else if (n <= 0) {
         if (client.cgiTask.pipe_out_fd != -1) { close(client.cgiTask.pipe_out_fd); client.cgiTask.pipe_out_fd = -1; }
     }
@@ -242,6 +243,7 @@ void WebServer::handleClientRead(int clientFd) {
 
     char buffer[kBufferSize];
     const ssize_t n = recv(clientFd, buffer, sizeof(buffer), 0);
+    if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return;
     if (n <= 0) { closeClient(clientFd); return; }
 
     client.request.feed(std::string(buffer, static_cast<std::size_t>(n)));
@@ -271,6 +273,7 @@ void WebServer::handleClientWrite(int clientFd) {
         const std::string chunk = client.response.getNextBytes(8192);
         if (!chunk.empty()) {
             const ssize_t n = send(clientFd, chunk.data(), chunk.size(), 0);
+            if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return;
             if (n <= 0) { closeClient(clientFd); return; }
             client.response.consumeBytes(static_cast<std::size_t>(n));
         }
