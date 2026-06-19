@@ -171,13 +171,23 @@ void buildResponseForRequest(ClientConnection& client, const std::vector<ServerC
     if (method != "GET") { buildErrorResponse(client, servers, 405, "Method unauthorized"); return; }
 
     if (FileUtils::isDirectory(resolvedPath)) {
-        std::string indexFile = (location && !location->index.empty()) ? location->index : "index.html";
-        std::string pathWithIndex = resolvedPath;
-        if (pathWithIndex[pathWithIndex.size() - 1] != '/') pathWithIndex += "/";
-        pathWithIndex += indexFile;
+        std::string indexFile = (location && !location->index.empty()) ? location->index : "";
+        if (indexFile.empty() && (!location || !location->autoindex) && !cfg.autoindex) {
+            indexFile = "index.html";
+        }
 
-        if (FileUtils::fileExists(pathWithIndex)) resolvedPath = pathWithIndex;
-        else {
+        bool indexFound = false;
+        if (!indexFile.empty()) {
+            std::string pathWithIndex = resolvedPath;
+            if (pathWithIndex[pathWithIndex.size() - 1] != '/') pathWithIndex += "/";
+            pathWithIndex += indexFile;
+            if (FileUtils::fileExists(pathWithIndex) && !FileUtils::isDirectory(pathWithIndex)) {
+                resolvedPath = pathWithIndex;
+                indexFound = true;
+            }
+        }
+
+        if (!indexFound) {
             bool autoindexActive = location ? location->autoindex : cfg.autoindex;
             if (autoindexActive) {
                 std::string listingBody;
