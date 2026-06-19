@@ -123,7 +123,7 @@ void WebServer::run() {
         rebuildPollFds();
         if (_pollFds.empty()) break;
 
-        const int ready = poll(&_pollFds[0], _pollFds.size(), 1000);
+        const int ready = poll(&_pollFds[0], _pollFds.size(), 100);
         if (ready < 0) { if (errno == EINTR) continue; break; }
 
         for (std::size_t i = 0; i < _pollFds.size(); ++i) {
@@ -177,23 +177,22 @@ void WebServer::handleCgiWrite(int clientFd) {
     if (it == _clients.end()) return;
     ClientConnection& client = it->second;
 
-    while (client.cgiTask.body_written < client.cgiTask.body_to_write.size()) {
-        const std::string& body = client.cgiTask.body_to_write;
-        std::size_t remaining = body.size() - client.cgiTask.body_written;
-        const ssize_t wrote = write(client.cgiTask.pipe_in_fd, body.data() + client.cgiTask.body_written, remaining);
-        if (wrote > 0) {
-            client.cgiTask.body_written += static_cast<std::size_t>(wrote);
-        } else if (wrote < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                break;
-            }
-            close(client.cgiTask.pipe_in_fd);
-            client.cgiTask.pipe_in_fd = -1;
-            break;
-        } else {
-            break;
-        }
+    if (client.cgiTask.body_written >= client.cgiTask.body_to_write.size()) {
+        if (client.cgiTask.pipe_in_fd != -1) { close(client.cgiTask.pipe_in_fd); client.cgiTask.pipe_in_fd = -1; }
+        return;
     }
+
+    const std::string& body = client.cgiTask.body_to_write;
+    std::size_t remaining = body.size() - client.cgiTask.body_written;
+    if (remaining > 8192) remaining = 8192;
+    const ssize_t wrote = write(client.cgiTask.pipe_in_fd, body.data() + client.cgiTask.body_written, remaining);
+    if (wrote > 0) {
+        client.cgiTask.body_written += static_cast<std::size_t>(wrote);
+    } else if (wrote < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+        close(client.cgiTask.pipe_in_fd);
+        client.cgiTask.pipe_in_fd = -1;
+    }
+
     if (client.cgiTask.body_written >= client.cgiTask.body_to_write.size()) {
         if (client.cgiTask.pipe_in_fd != -1) { close(client.cgiTask.pipe_in_fd); client.cgiTask.pipe_in_fd = -1; }
     }
@@ -205,20 +204,13 @@ void WebServer::handleCgiRead(int clientFd) {
     ClientConnection& client = it->second;
 
     char buffer[4096];
-    while (true) {
-        const ssize_t n = read(client.cgiTask.pipe_out_fd, buffer, sizeof(buffer));
-        if (n > 0) {
-            client.cgiTask.cgi_output.append(buffer, static_cast<std::size_t>(n));
-        } else if (n < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                break;
-            }
-            if (client.cgiTask.pipe_out_fd != -1) { close(client.cgiTask.pipe_out_fd); client.cgiTask.pipe_out_fd = -1; }
-            break;
-        } else {
-            if (client.cgiTask.pipe_out_fd != -1) { close(client.cgiTask.pipe_out_fd); client.cgiTask.pipe_out_fd = -1; }
-            break;
-        }
+    const ssize_t n = read(client.cgiTask.pipe_out_fd, buffer, sizeof(buffer));
+    if (n > 0) {
+        client.cgiTask.cgi_output.append(buffer, static_cast<std::size_t>(n));
+    } else if (n == 0) {
+        if (client.cgiTask.pipe_out_fd != -1) { close(client.cgiTask.pipe_out_fd); client.cgiTask.pipe_out_fd = -1; }
+    } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
+        if (client.cgiTask.pipe_out_fd != -1) { close(client.cgiTask.pipe_out_fd); client.cgiTask.pipe_out_fd = -1; }
     }
 }
 
@@ -235,7 +227,7 @@ void WebServer::checkCgiTimeouts() {
                     client.cgiTask.exit_status = WEXITSTATUS(wstatus);
                 } else if (w == 0 && (nowMs - client.cgiTask.start_time_ms >= 10000)) {
                     kill(client.cgiTask.pid, SIGKILL);
-                    waitpid(client.cgiTask.pid, NULL, 0);
+                    waitpid(client.cgiTask.pid, NULL, WNOHANG);
                     client.cgiTask.process_exited = true;
                     client.cgiTask.exit_status = 1;
                 }
@@ -261,37 +253,32 @@ void WebServer::handleClientRead(int clientFd) {
     ClientConnection& client = it->second;
 
     char buffer[kBufferSize];
-    while (true) {
-        const ssize_t n = recv(clientFd, buffer, sizeof(buffer), 0);
-        if (n < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                break;
-            }
-            closeClient(clientFd);
-            return;
-        }
-        if (n == 0) {
-            closeClient(clientFd);
-            return;
-        }
+    const ssize_t n = recv(clientFd, buffer, sizeof(buffer), 0);
+    if (n < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) return;
+        closeClient(clientFd);
+        return;
+    }
+    if (n == 0) {
+        closeClient(clientFd);
+        return;
+    }
 
-        client.request.feed(std::string(buffer, static_cast<std::size_t>(n)));
+    client.request.feed(std::string(buffer, static_cast<std::size_t>(n)));
 
-        if (client.request.hasError()) {
-            int errCode = client.request.getErrorStatus() ? client.request.getErrorStatus() : 400;
-            if (errCode == 501) errCode = 405; 
-            HttpHandler::buildErrorResponse(client, _servers, errCode, client.request.getErrorMessage());
-            client.closeAfterSend = true;
-            client.hasResponse = true;
-            return;
-        }
+    if (client.request.hasError()) {
+        int errCode = client.request.getErrorStatus() ? client.request.getErrorStatus() : 400;
+        if (errCode == 501) errCode = 405; 
+        HttpHandler::buildErrorResponse(client, _servers, errCode, client.request.getErrorMessage());
+        client.closeAfterSend = true;
+        client.hasResponse = true;
+        return;
+    }
 
-        if (client.request.isComplete()) {
-            client.carryBuffer = client.request.releaseUnparsedBuffer();
-            HttpHandler::buildResponseForRequest(client, _servers);
-            client.hasResponse = true;
-            break;
-        }
+    if (client.request.isComplete()) {
+        client.carryBuffer = client.request.releaseUnparsedBuffer();
+        HttpHandler::buildResponseForRequest(client, _servers);
+        client.hasResponse = true;
     }
 }
 
@@ -300,24 +287,21 @@ void WebServer::handleClientWrite(int clientFd) {
     if (it == _clients.end()) return;
     ClientConnection& client = it->second;
 
-    while (client.hasResponse && !client.response.isComplete()) {
+    if (client.hasResponse && !client.response.isComplete()) {
         const std::string chunk = client.response.getNextBytes(8192);
-        if (chunk.empty()) {
-            break;
-        }
-        const ssize_t n = send(clientFd, chunk.data(), chunk.size(), 0);
-        if (n < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        if (!chunk.empty()) {
+            const ssize_t n = send(clientFd, chunk.data(), chunk.size(), 0);
+            if (n < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) return;
+                closeClient(clientFd);
                 return;
             }
-            closeClient(clientFd);
-            return;
+            if (n == 0) {
+                closeClient(clientFd);
+                return;
+            }
+            client.response.consumeBytes(static_cast<std::size_t>(n));
         }
-        if (n == 0) {
-            closeClient(clientFd);
-            return;
-        }
-        client.response.consumeBytes(static_cast<std::size_t>(n));
     }
 
     if (!client.response.isComplete()) return;
