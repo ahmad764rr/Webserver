@@ -490,7 +490,9 @@ bool HttpResponse::buildHeadersBlock() {
     } else {
         _headers.erase("transfer-encoding");
         if (!isNoBodyStatus(_statusCode)) {
-            _headers["content-length"] = sizeToString(_body.size());
+            if (_headers.find("content-length") == _headers.end()) {
+                _headers["content-length"] = sizeToString(_body.size());
+            }
         } else {
             _headers.erase("content-length");
         }

@@ -30,5 +30,6 @@ ClientConnection::ClientConnection()
     : fd(-1),
       serverIndex(0),
       hasResponse(false),
-      closeAfterSend(false) {
+      closeAfterSend(false),
+      sendFileFd(-1) {
 }

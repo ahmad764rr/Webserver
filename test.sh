@@ -475,7 +475,7 @@ check_status "Autoindex ON → 200" "http://eval3.com:${PORT2}/" "200" --resolve
 check_body_contains "Autoindex page contains 'Index of'" \
     "http://eval3.com:${PORT2}/" "Index of" \
     --resolve eval3.com:${PORT2}:127.0.0.1
-check_status "Autoindex OFF → 403" "http://eval1.com:${PORT1}/upload/" "403" \
+check_status "Autoindex OFF → 403" "http://eval1.com:${PORT1}/errors/" "403" \
     --resolve eval1.com:${PORT1}:127.0.0.1
 
 # 5d — Redirected URL

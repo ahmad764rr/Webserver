@@ -20,3 +20,6 @@ www/upload/uploaded_*
 temp_large.txt
 temp_small.txt
 upload_data.txt
+www/upload/1GB.bin www/upload/upload_1781549472_383.bin www/upload/upload_1781549486_383.bin www/upload/upload_1781549728_383.bin www/upload/upload_1781549901_383.bin www/upload/upload_1781550116_383.bin www/upload/upload_1781550139_383.bin www/upload/upload_1781676287_383.bin www/upload/upload_1781676735_383.bin www/upload/upload_1781677665_383.bin www/upload/upload_1781677968_383.bin www/upload/upload_1781678573_383.bin www/upload/upload_1781678779_383.bin www/upload/upload_1781678867_383.bin www/upload/upload_1781686295_383.bin www/upload/upload_1781686393_383.bin www/upload/upload_1781686523_383.bin www/upload/upload_1781686591_383.bin www/upload/upload_1781686627_383.bin www/upload/upload_1781686692_383.bin www/upload/upload_1781686731_383.bin www/upload/upload_1781905394_383.bin www/upload/upload_1781905450_383.bin www/upload/upload_1781905539_383.bin www/upload/upload_1781905816_383.bin www/upload/upload_1781905854_383.bin www/upload/upload_1781906458_383.bin www/upload/upload_1781906484_383.bin www/upload/upload_1781906598_383.bin www/upload/upload_1781906622_383.bin www/upload/upload_1781906907_383.bin www/upload/upload_1781907642_383.bin www/upload/upload_1781908989_383.bin www/upload/upload_1781909079_383.bin
+www/upload/*.wmv
+www/upload/1GB.bin:Zone.Identifier

@@ -8,6 +8,8 @@
 #include <cstdlib>
 #include <sstream>
 #include <fstream>
+#include <fcntl.h>
+#include <unistd.h>
 #include <sys/stat.h>
 
 
@@ -211,13 +213,26 @@ void buildResponseForRequest(ClientConnection& client, const std::vector<ServerC
         }
     }
 
-    std::string body;
-    if (!FileUtils::loadFile(resolvedPath, body)) { buildErrorResponse(client, servers, 404, "Target missing"); return; }
-
+    struct stat fileStat;
+    if (stat(resolvedPath.c_str(), &fileStat) != 0 || !S_ISREG(fileStat.st_mode)) {
+        buildErrorResponse(client, servers, 404, "Target missing"); return;
+    }
+    int fileFd = open(resolvedPath.c_str(), O_RDONLY);
+    if (fileFd < 0) {
+        buildErrorResponse(client, servers, 500, "Failed to open file"); return;
+    }
+    client.sendFileFd = fileFd;
+    std::ostringstream sizeStr;
+    sizeStr << fileStat.st_size;
     client.response.setStatusCode(200);
     client.response.setContentType(FileUtils::mimeTypeForPath(resolvedPath));
-    client.response.setBody(body);
-    if (client.response.prepare() == HttpResponse::ERROR) { buildErrorResponse(client, servers, 500, client.response.getErrorMessage()); client.closeAfterSend = true; }
+    client.response.setHeader("Content-Length", sizeStr.str());
+    if (client.response.prepare() == HttpResponse::ERROR) {
+        close(fileFd);
+        client.sendFileFd = -1;
+        buildErrorResponse(client, servers, 500, client.response.getErrorMessage());
+        client.closeAfterSend = true;
+    }
 }
 
 } // namespace HttpHandler

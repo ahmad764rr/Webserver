@@ -83,7 +83,7 @@ void WebServer::rebuildPollFds() {
     }
     for (std::map<int, ClientConnection>::const_iterator it = _clients.begin(); it != _clients.end(); ++it) {
         struct pollfd p; p.fd = it->first; p.events = POLLIN;
-        if (it->second.hasResponse) p.events |= POLLOUT;
+        if (it->second.hasResponse || it->second.sendFileFd != -1 || !it->second.sendFileBuf.empty()) p.events |= POLLOUT;
         p.revents = 0; _pollFds.push_back(p);
 
         if (it->second.cgiTask.active) {
@@ -287,6 +287,7 @@ void WebServer::handleClientWrite(int clientFd) {
     if (it == _clients.end()) return;
     ClientConnection& client = it->second;
 
+    // Phase 1: Send response headers (and any in-memory body)
     if (client.hasResponse && !client.response.isComplete()) {
         const std::string chunk = client.response.getNextBytes(8192);
         if (!chunk.empty()) {
@@ -302,10 +303,51 @@ void WebServer::handleClientWrite(int clientFd) {
             }
             client.response.consumeBytes(static_cast<std::size_t>(n));
         }
+        return;
+    }
+
+    // Phase 2: Stream file body in small chunks (non-blocking)
+    if (client.sendFileFd != -1 || !client.sendFileBuf.empty()) {
+        // First drain any buffered data from a previous partial send
+        if (!client.sendFileBuf.empty()) {
+            const ssize_t n = send(clientFd, client.sendFileBuf.data(), client.sendFileBuf.size(), 0);
+            if (n < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) return;
+                closeClient(clientFd); return;
+            }
+            if (n == 0) { closeClient(clientFd); return; }
+            if (static_cast<std::size_t>(n) < client.sendFileBuf.size())
+                client.sendFileBuf.erase(0, static_cast<std::size_t>(n));
+            else
+                client.sendFileBuf.clear();
+            return;
+        }
+        // Read next chunk from file and send
+        char buf[8192];
+        const ssize_t r = read(client.sendFileFd, buf, sizeof(buf));
+        if (r > 0) {
+            const ssize_t n = send(clientFd, buf, static_cast<std::size_t>(r), 0);
+            if (n < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    client.sendFileBuf.assign(buf, static_cast<std::size_t>(r));
+                    return;
+                }
+                closeClient(clientFd); return;
+            }
+            if (n == 0) { closeClient(clientFd); return; }
+            if (n < r)
+                client.sendFileBuf.assign(buf + n, static_cast<std::size_t>(r - n));
+            return;
+        }
+        // EOF or read error — done streaming
+        close(client.sendFileFd);
+        client.sendFileFd = -1;
+        // Fall through to connection cleanup
     }
 
     if (!client.response.isComplete()) return;
 
+    // Phase 3: Response fully sent — handle keep-alive or close
     client.hasResponse = false;
     if (client.closeAfterSend) { closeClient(clientFd); return; }
 
@@ -337,6 +379,10 @@ void WebServer::handleClientWrite(int clientFd) {
 void WebServer::closeClient(int clientFd) {
     std::map<int, ClientConnection>::iterator it = _clients.find(clientFd);
     if (it != _clients.end()) {
+        if (it->second.sendFileFd != -1) {
+            close(it->second.sendFileFd);
+            it->second.sendFileFd = -1;
+        }
         it->second.cgiTask.cleanup();
         close(it->first);
         _clients.erase(it);

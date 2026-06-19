@@ -32,6 +32,10 @@ struct ClientConnection {
     std::string carryBuffer;
     CgiTask cgiTask;
 
+    // File streaming for non-blocking large file downloads
+    int sendFileFd;
+    std::string sendFileBuf;
+
     ClientConnection();
 };
 
