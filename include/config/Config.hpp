@@ -27,10 +27,10 @@ private:
                           std::size_t& index,
                           ServerConfig& cfg,
                           std::string& error) const;
-    bool parseRouteBlock(const std::vector<std::string>& tokens,
-                         std::size_t& index,
-                         RouteConfig& cfg,
-                         std::string& error) const;
+    bool parseLocationBlock(const std::vector<std::string>& tokens,
+                            std::size_t& index,
+                            LocationConfig& cfg,
+                            std::string& error) const;
 
     static bool isValidPort(int port);
     static std::string trim(const std::string& value);

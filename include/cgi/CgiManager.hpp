@@ -7,8 +7,8 @@
 
 namespace CgiManager {
 
-    bool shouldUseCgi(const ServerConfig& cfg, const RouteConfig* route, const HttpRequest& request, std::string& ext);
-    bool setupCgiTask(const ServerConfig& cfg, const RouteConfig* route, const std::string& matchedKey, ClientConnection& client, const std::string& scriptExt);
+    bool shouldUseCgi(const ServerConfig& cfg, const LocationConfig* location, const HttpRequest& request, std::string& ext);
+    bool setupCgiTask(const ServerConfig& cfg, const LocationConfig* location, const std::string& matchedKey, ClientConnection& client, const std::string& scriptExt);
     void applyCgiOutputToResponse(const std::string& cgiOutput, HttpResponse& response);
 
 }

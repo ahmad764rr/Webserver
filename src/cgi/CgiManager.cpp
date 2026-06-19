@@ -9,23 +9,23 @@
 
 namespace CgiManager {
 
-bool shouldUseCgi(const ServerConfig& cfg, const RouteConfig* route, const HttpRequest& request, std::string& ext) {
+bool shouldUseCgi(const ServerConfig& cfg, const LocationConfig* location, const HttpRequest& request, std::string& ext) {
     ext.clear();
     const std::string& path = request.getPath();
     const std::size_t dot = path.find_last_of('.');
     if (dot == std::string::npos) return false;
     ext = path.substr(dot);
-    if (route && route->cgiInterpreters.find(ext) != route->cgiInterpreters.end()) return true;
+    if (location && location->cgiInterpreters.find(ext) != location->cgiInterpreters.end()) return true;
     return cfg.cgiInterpreters.find(ext) != cfg.cgiInterpreters.end();
 }
 
-bool setupCgiTask(const ServerConfig& cfg, const RouteConfig* route, const std::string& matchedKey, ClientConnection& client, const std::string& scriptExt) {
+bool setupCgiTask(const ServerConfig& cfg, const LocationConfig* location, const std::string& matchedKey, ClientConnection& client, const std::string& scriptExt) {
     const HttpRequest& request = client.request;
 
-    std::string scriptPath = HttpHandler::resolvePath(cfg, route, matchedKey, request.getPath());
+    std::string scriptPath = HttpHandler::resolvePath(cfg, location, matchedKey, request.getPath());
     if (scriptPath.empty()) return false;
 
-    std::string interpreterPath = (route && route->cgiInterpreters.count(scriptExt)) ? route->cgiInterpreters.find(scriptExt)->second : cfg.cgiInterpreters.find(scriptExt)->second;
+    std::string interpreterPath = (location && location->cgiInterpreters.count(scriptExt)) ? location->cgiInterpreters.find(scriptExt)->second : cfg.cgiInterpreters.find(scriptExt)->second;
 
     HttpRequest requestCopy = request; 
     short cgiError = 0;

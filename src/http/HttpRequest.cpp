@@ -154,7 +154,7 @@ bool HttpRequest::parseRequestLine(const std::string& line) {
         return false;
     }
 
-    if (_version != "HTTP/1.1") {
+    if (_version != "HTTP/1.1" && _version != "HTTP/1.0") {
         setError(505, "unsupported HTTP version");
         return false;
     }
@@ -216,10 +216,12 @@ bool HttpRequest::parseHeaderLine(const std::string& line) {
 }
 
 bool HttpRequest::finalizeHeaders() {
-    const std::map<std::string, std::string>::const_iterator hostIt = _headers.find("host");
-    if (hostIt == _headers.end() || trim(hostIt->second).empty()) {
-        setError(400, "missing required Host header");
-        return false;
+    if (_version == "HTTP/1.1") {
+        const std::map<std::string, std::string>::const_iterator hostIt = _headers.find("host");
+        if (hostIt == _headers.end() || trim(hostIt->second).empty()) {
+            setError(400, "missing required Host header");
+            return false;
+        }
     }
 
     const std::map<std::string, std::string>::const_iterator teIt = _headers.find("transfer-encoding");

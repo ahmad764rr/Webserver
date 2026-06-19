@@ -75,7 +75,7 @@ char* CgiHandler::_strdup_safe(const std::string& str) {
  */
 void CgiHandler::_setupEnvMap(HttpRequest& request) {
     _env_map["GATEWAY_INTERFACE"] = "CGI/1.1";
-    _env_map["SERVER_PROTOCOL"] = "HTTP/1.1";
+    _env_map["SERVER_PROTOCOL"] = request.getVersion();
     _env_map["SERVER_SOFTWARE"] = "Webserv/1.0";
     _env_map["REQUEST_METHOD"] = request.getMethod();
     _env_map["QUERY_STRING"] = request.getQueryString();

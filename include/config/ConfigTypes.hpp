@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-struct RouteConfig {
+struct LocationConfig {
     std::vector<std::string> allowedMethods;
     std::pair<int, std::string> redirect;
     std::string root;
@@ -16,18 +16,17 @@ struct RouteConfig {
     std::string uploadDir;
     std::map<std::string, std::string> cgiInterpreters;
 
-    RouteConfig();
+    LocationConfig();
 };
 
 struct ServerConfig {
     int listenPort;
     std::string root;
-    std::string serverName;
     std::size_t clientMaxBodySize;
     bool autoindex;
     std::map<int, std::string> errorPages;
     std::map<std::string, std::string> cgiInterpreters;
-    std::map<std::string, RouteConfig> routes;
+    std::map<std::string, LocationConfig> locations;
 
     ServerConfig();
 };

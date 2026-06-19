@@ -113,7 +113,6 @@ void WebServer::acceptClient(int listenFd) {
         conn.fd = clientFd;
         conn.serverIndex = defaultIndex;
         conn.request.setClientMaxBodySize(_servers[defaultIndex].clientMaxBodySize);
-        conn.response.setServerName(_servers[defaultIndex].serverName);
         _clients[clientFd] = conn;
     }
 }
@@ -258,7 +257,6 @@ void WebServer::handleClientRead(int clientFd) {
 
     if (client.request.isComplete()) {
         client.carryBuffer = client.request.releaseUnparsedBuffer();
-        HttpHandler::refineServerSelection(client, _servers);
         HttpHandler::buildResponseForRequest(client, _servers);
         client.hasResponse = true;
     }
@@ -286,7 +284,6 @@ void WebServer::handleClientWrite(int clientFd) {
     client.request.reset();
     client.request.setClientMaxBodySize(_servers[client.serverIndex].clientMaxBodySize);
     client.response.reset();
-    client.response.setServerName(_servers[client.serverIndex].serverName);
 
     if (!client.carryBuffer.empty()) {
         const std::string carry = client.carryBuffer;
@@ -303,7 +300,6 @@ void WebServer::handleClientWrite(int clientFd) {
         }
         if (client.request.isComplete()) {
             client.carryBuffer = client.request.releaseUnparsedBuffer();
-            HttpHandler::refineServerSelection(client, _servers);
             HttpHandler::buildResponseForRequest(client, _servers);
             client.hasResponse = true;
         }

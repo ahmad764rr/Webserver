@@ -164,20 +164,6 @@ bool ConfigParser::parseServerBlock(const std::vector<std::string>& tokens,
             continue;
         }
 
-        if (directive == "server_name") {
-            if (index >= tokens.size()) {
-                error = "server_name requires a value";
-                return false;
-            }
-            cfg.serverName = tokens[index++];
-            if (index >= tokens.size() || tokens[index] != ";") {
-                error = "server_name directive must end with ';'";
-                return false;
-            }
-            ++index;
-            continue;
-        }
-
         if (directive == "client_max_body_size") {
             if (index >= tokens.size()) {
                 error = "client_max_body_size requires a value";
@@ -233,23 +219,23 @@ bool ConfigParser::parseServerBlock(const std::vector<std::string>& tokens,
             continue;
         }
 
-        if (directive == "route" || directive == "location") {
+        if (directive == "location") {
             if (index >= tokens.size()) {
-                error = "route requires a path";
+                error = "location requires a path";
                 return false;
             }
             std::string path = tokens[index++];
             if (index >= tokens.size() || tokens[index] != "{") {
-                error = "expected '{' after route path";
+                error = "expected '{' after location path";
                 return false;
             }
             ++index;
             
-            RouteConfig routeCfg;
-            if (!parseRouteBlock(tokens, index, routeCfg, error)) {
+            LocationConfig locCfg;
+            if (!parseLocationBlock(tokens, index, locCfg, error)) {
                 return false;
             }
-            cfg.routes[path] = routeCfg;
+            cfg.locations[path] = locCfg;
             continue;
         }
 
@@ -283,10 +269,10 @@ bool ConfigParser::parseServerBlock(const std::vector<std::string>& tokens,
     return false;
 }
 
-bool ConfigParser::parseRouteBlock(const std::vector<std::string>& tokens,
-                                   std::size_t& index,
-                                   RouteConfig& cfg,
-                                   std::string& error) const {
+bool ConfigParser::parseLocationBlock(const std::vector<std::string>& tokens,
+                                      std::size_t& index,
+                                      LocationConfig& cfg,
+                                      std::string& error) const {
     while (index < tokens.size()) {
         if (tokens[index] == "}") {
             ++index;
@@ -415,11 +401,11 @@ bool ConfigParser::parseRouteBlock(const std::vector<std::string>& tokens,
             continue;
         }
 
-        error = "unknown route directive: " + directive;
+        error = "unknown location directive: " + directive;
         return false;
     }
 
-    error = "route block not closed with '}'";
+    error = "location block not closed with '}'";
     return false;
 }
 

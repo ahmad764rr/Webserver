@@ -10,37 +10,28 @@
 #include <fstream>
 #include <sys/stat.h>
 
-namespace {
-    std::string toLowerCopy(const std::string& value) {
-        std::string out = value;
-        for (std::size_t i = 0; i < out.size(); ++i) {
-            if (out[i] >= 'A' && out[i] <= 'Z') out[i] = static_cast<char>(out[i] - 'A' + 'a');
-        }
-        return out;
-    }
-}
 
 namespace HttpHandler {
 
-const RouteConfig* findRoute(const ServerConfig& cfg, const std::string& requestPath, std::string& matchedKey) {
-    const RouteConfig* bestMatch = NULL;
+const LocationConfig* findLocation(const ServerConfig& cfg, const std::string& requestPath, std::string& matchedKey) {
+    const LocationConfig* bestMatch = NULL;
     std::size_t longestMatch = 0;
     matchedKey.clear();
-    for (std::map<std::string, RouteConfig>::const_iterator it = cfg.routes.begin(); it != cfg.routes.end(); ++it) {
-        const std::string& routePath = it->first;
-        if (requestPath.find(routePath) == 0 && routePath.length() > longestMatch) {
-            longestMatch = routePath.length(); bestMatch = &it->second; matchedKey = routePath;
+    for (std::map<std::string, LocationConfig>::const_iterator it = cfg.locations.begin(); it != cfg.locations.end(); ++it) {
+        const std::string& locationPath = it->first;
+        if (requestPath.find(locationPath) == 0 && locationPath.length() > longestMatch) {
+            longestMatch = locationPath.length(); bestMatch = &it->second; matchedKey = locationPath;
         }
     }
     return bestMatch;
 }
 
-std::string resolvePath(const ServerConfig& cfg, const RouteConfig* route, const std::string& matchedKey, const std::string& requestPath) {
+std::string resolvePath(const ServerConfig& cfg, const LocationConfig* location, const std::string& matchedKey, const std::string& requestPath) {
     if (requestPath.find("..") != std::string::npos) return "";
-    std::string full = (route && !route->root.empty()) ? route->root : cfg.root;
+    std::string full = (location && !location->root.empty()) ? location->root : cfg.root;
     if (full.empty()) full = ".";
 
-    if (route && !route->root.empty() && !matchedKey.empty()) {
+    if (location && !location->root.empty() && !matchedKey.empty()) {
         std::string remainingPath = requestPath.substr(matchedKey.length());
         if (full[full.size() - 1] == '/' && !remainingPath.empty() && remainingPath[0] == '/') full.erase(full.size() - 1);
         else if (full[full.size() - 1] != '/' && !remainingPath.empty() && remainingPath[0] != '/') full += "/";
@@ -53,36 +44,7 @@ std::string resolvePath(const ServerConfig& cfg, const RouteConfig* route, const
     return full;
 }
 
-void refineServerSelection(ClientConnection& client, const std::vector<ServerConfig>& servers) {
-    int activePort = servers[client.serverIndex].listenPort;
-    
-    std::string hostHeader = client.request.getHeader("host");
-    if (hostHeader.empty()) hostHeader = client.request.getHeader("Host");
-    if (hostHeader.empty()) hostHeader = client.request.getHeader("HOST");
-    
-    if (!hostHeader.empty()) {
-        std::size_t start = hostHeader.find_first_not_of(" \t\r\n");
-        if (start != std::string::npos) hostHeader = hostHeader.substr(start);
-        else hostHeader.clear();
-    }
-    if (!hostHeader.empty()) {
-        std::size_t end = hostHeader.find_last_not_of(" \t\r\n");
-        if (end != std::string::npos) hostHeader = hostHeader.substr(0, end + 1);
-    }
-    
-    hostHeader = toLowerCopy(hostHeader);
-    
-    std::size_t colon = hostHeader.find(':');
-    if (colon != std::string::npos) hostHeader = hostHeader.substr(0, colon);
 
-    for (std::size_t i = 0; i < servers.size(); ++i) {
-        if (servers[i].listenPort == activePort && servers[i].serverName == hostHeader) {
-            client.serverIndex = i;
-            client.request.setClientMaxBodySize(servers[i].clientMaxBodySize);
-            break;
-        }
-    }
-}
 
 void applyConfiguredErrorPage(const ServerConfig& cfg, int statusCode, HttpResponse& response) {
     std::map<int, std::string>::const_iterator it = cfg.errorPages.find(statusCode);
@@ -95,11 +57,11 @@ void applyConfiguredErrorPage(const ServerConfig& cfg, int statusCode, HttpRespo
 
 void buildErrorResponse(ClientConnection& client, const std::vector<ServerConfig>& servers, int statusCode, const std::string& message) {
     const ServerConfig& cfg = servers[client.serverIndex];
-    client.response = HttpResponse::stockResponse(statusCode, !client.closeAfterSend, cfg.serverName);
+    client.response = HttpResponse::stockResponse(statusCode, !client.closeAfterSend);
     applyConfiguredErrorPage(cfg, statusCode, client.response);
     if (!message.empty()) client.response.setHeader("x-webserv-error", message);
     if (client.response.prepare() == HttpResponse::ERROR) {
-        HttpResponse fallback = HttpResponse::stockResponse(500, false, cfg.serverName); fallback.prepare();
+        HttpResponse fallback = HttpResponse::stockResponse(500, false); fallback.prepare();
         client.response = fallback; client.closeAfterSend = true;
     }
 }
@@ -107,11 +69,14 @@ void buildErrorResponse(ClientConnection& client, const std::vector<ServerConfig
 bool connectionShouldClose(const HttpRequest& request) {
     std::string conn = request.getHeader("connection");
     for (std::size_t i = 0; i < conn.size(); ++i) if (conn[i] >= 'A' && conn[i] <= 'Z') conn[i] = static_cast<char>(conn[i] - 'A' + 'a');
+    if (request.getVersion() == "HTTP/1.0") {
+        return conn != "keep-alive";
+    }
     return conn == "close";
 }
 
-void handleUpload(ClientConnection& client, const std::vector<ServerConfig>& servers, const RouteConfig* route, const std::string& resolvedPath) {
-    std::string uploadTargetDir = route->uploadDir;
+void handleUpload(ClientConnection& client, const std::vector<ServerConfig>& servers, const LocationConfig* location, const std::string& resolvedPath) {
+    std::string uploadTargetDir = location->uploadDir;
     if (uploadTargetDir.empty()) uploadTargetDir = "./www/upload";
 
     struct stat st;
@@ -145,7 +110,7 @@ void buildResponseForRequest(ClientConnection& client, const std::vector<ServerC
     const HttpRequest& request = client.request;
 
     client.response.reset();
-    client.response.setServerName(cfg.serverName);
+    client.response.setVersion(request.getVersion());
     client.response.setKeepAlive(!connectionShouldClose(request));
     client.closeAfterSend = connectionShouldClose(request);
 
@@ -160,38 +125,38 @@ void buildResponseForRequest(ClientConnection& client, const std::vector<ServerC
         return;
     }
 
-    std::string routeMatchedPath;
-    const RouteConfig* route = findRoute(cfg, request.getPath(), routeMatchedPath);
+    std::string locationMatchedPath;
+    const LocationConfig* location = findLocation(cfg, request.getPath(), locationMatchedPath);
 
-    if (route && !route->allowedMethods.empty()) {
+    if (location && !location->allowedMethods.empty()) {
         bool authorized = false;
-        for (std::size_t i = 0; i < route->allowedMethods.size(); ++i) {
-            if (route->allowedMethods[i] == method) { authorized = true; break; }
+        for (std::size_t i = 0; i < location->allowedMethods.size(); ++i) {
+            if (location->allowedMethods[i] == method) { authorized = true; break; }
         }
-        if (!authorized) { buildErrorResponse(client, servers, 405, "Method not allowed on explicit route mapping"); return; }
+        if (!authorized) { buildErrorResponse(client, servers, 405, "Method not allowed on explicit location mapping"); return; }
     }
 
-    if (route && route->redirect.first >= 300 && route->redirect.first <= 399) {
-        client.response.setStatusCode(route->redirect.first);
-        client.response.setHeader("location", route->redirect.second);
+    if (location && location->redirect.first >= 300 && location->redirect.first <= 399) {
+        client.response.setStatusCode(location->redirect.first);
+        client.response.setHeader("location", location->redirect.second);
         client.response.prepare();
         return;
     }
 
-    std::string resolvedPath = resolvePath(cfg, route, routeMatchedPath, request.getPath());
+    std::string resolvedPath = resolvePath(cfg, location, locationMatchedPath, request.getPath());
     if (resolvedPath.empty()) { buildErrorResponse(client, servers, 403, "Forbidden path access detected"); return; }
 
     std::string ext;
-    if (CgiManager::shouldUseCgi(cfg, route, request, ext)) {
-        if (!CgiManager::setupCgiTask(cfg, route, routeMatchedPath, client, ext)) {
+    if (CgiManager::shouldUseCgi(cfg, location, request, ext)) {
+        if (!CgiManager::setupCgiTask(cfg, location, locationMatchedPath, client, ext)) {
             buildErrorResponse(client, servers, 502, "Failed to start CGI engine");
             client.closeAfterSend = true; client.hasResponse = true;
         } else { client.hasResponse = false; }
         return;
     }
 
-    if (method == "POST" && route && route->uploadEnable) {
-        handleUpload(client, servers, route, resolvedPath);
+    if (method == "POST" && location && location->uploadEnable) {
+        handleUpload(client, servers, location, resolvedPath);
         return;
     }
 
@@ -206,14 +171,14 @@ void buildResponseForRequest(ClientConnection& client, const std::vector<ServerC
     if (method != "GET") { buildErrorResponse(client, servers, 405, "Method unauthorized"); return; }
 
     if (FileUtils::isDirectory(resolvedPath)) {
-        std::string indexFile = (route && !route->index.empty()) ? route->index : "index.html";
+        std::string indexFile = (location && !location->index.empty()) ? location->index : "index.html";
         std::string pathWithIndex = resolvedPath;
         if (pathWithIndex[pathWithIndex.size() - 1] != '/') pathWithIndex += "/";
         pathWithIndex += indexFile;
 
         if (FileUtils::fileExists(pathWithIndex)) resolvedPath = pathWithIndex;
         else {
-            bool autoindexActive = route ? route->autoindex : cfg.autoindex;
+            bool autoindexActive = location ? location->autoindex : cfg.autoindex;
             if (autoindexActive) {
                 std::string listingBody;
                 if (FileUtils::generateAutoIndex(resolvedPath, request.getPath(), listingBody)) {

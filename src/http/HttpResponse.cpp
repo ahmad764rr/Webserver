@@ -16,7 +16,6 @@ HttpResponse::HttpResponse()
       _version("HTTP/1.1"),
       _statusCode(200),
       _reasonPhrase(defaultReasonPhrase(200)),
-      _serverName("webserv"),
       _keepAlive(true),
       _headResponse(false),
       _chunkedFinished(false),
@@ -25,20 +24,6 @@ HttpResponse::HttpResponse()
       _maxHeaderBytes(kDefaultMaxHeaderBytes) {
 }
 
-HttpResponse::HttpResponse(const std::string& serverName)
-    : _state(BUILDING),
-      _bodyMode(BODY_MODE_NONE),
-      _version("HTTP/1.1"),
-      _statusCode(200),
-      _reasonPhrase(defaultReasonPhrase(200)),
-      _serverName(serverName),
-      _keepAlive(true),
-      _headResponse(false),
-      _chunkedFinished(false),
-      _sendOffset(0),
-      _totalBytesSent(0),
-      _maxHeaderBytes(kDefaultMaxHeaderBytes) {
-}
 
 HttpResponse::~HttpResponse() {
 }
@@ -52,7 +37,6 @@ void HttpResponse::reset() {
     _reasonPhrase = defaultReasonPhrase(200);
     _headers.clear();
     _body.clear();
-    _serverName = "webserv";
     _keepAlive = true;
     _headResponse = false;
     _chunkedFinished = false;
@@ -192,17 +176,6 @@ HttpResponse::BodyMode HttpResponse::getBodyMode() const {
 
 void HttpResponse::setContentType(const std::string& contentType) {
     setHeader("content-type", contentType);
-}
-
-void HttpResponse::setServerName(const std::string& serverName) {
-    if (!ensureBuildingState()) {
-        return;
-    }
-    _serverName = serverName;
-}
-
-const std::string& HttpResponse::getServerName() const {
-    return _serverName;
 }
 
 void HttpResponse::setKeepAlive(bool keepAlive) {
@@ -399,9 +372,8 @@ std::size_t HttpResponse::getMaxHeaderBytes() const {
 }
 
 HttpResponse HttpResponse::stockResponse(int statusCode,
-                                         bool keepAlive,
-                                         const std::string& serverName) {
-    HttpResponse response(serverName);
+                                         bool keepAlive) {
+    HttpResponse response;
     response.setStatusCode(statusCode);
     response.setKeepAlive(keepAlive);
 
@@ -469,8 +441,8 @@ std::string HttpResponse::buildDefaultErrorPage(int statusCode,
 }
 
 bool HttpResponse::validateBeforePrepare() {
-    if (_version != "HTTP/1.1") {
-        setError("only HTTP/1.1 responses are supported");
+    if (_version != "HTTP/1.1" && _version != "HTTP/1.0") {
+        setError("only HTTP/1.1 and HTTP/1.0 responses are supported");
         return false;
     }
     if (_statusCode < 100 || _statusCode > 599) {
@@ -508,8 +480,8 @@ bool HttpResponse::buildHeadersBlock() {
     if (!_headers.count("date")) {
         _headers["date"] = formatHttpDate();
     }
-    if (!_serverName.empty() && !_headers.count("server")) {
-        _headers["server"] = _serverName;
+    if (!_headers.count("server")) {
+        _headers["server"] = "webserv";
     }
 
     if (_bodyMode == BODY_MODE_CHUNKED) {

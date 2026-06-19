@@ -22,7 +22,6 @@ public:
     };
 
     HttpResponse();
-    explicit HttpResponse(const std::string& serverName);
     ~HttpResponse();
 
     void reset();
@@ -48,8 +47,6 @@ public:
     BodyMode getBodyMode() const;
 
     void setContentType(const std::string& contentType);
-    void setServerName(const std::string& serverName);
-    const std::string& getServerName() const;
     void setKeepAlive(bool keepAlive);
     bool getKeepAlive() const;
     void setHeadResponse(bool enabled);
@@ -77,8 +74,7 @@ public:
     std::size_t getMaxHeaderBytes() const;
 
     static HttpResponse stockResponse(int statusCode,
-                                      bool keepAlive,
-                                      const std::string& serverName);
+                                      bool keepAlive);
     static std::string defaultReasonPhrase(int statusCode);
     static std::string buildDefaultErrorPage(int statusCode,
                                              const std::string& reasonPhrase);
@@ -92,7 +88,6 @@ private:
     std::string _reasonPhrase;
     std::map<std::string, std::string> _headers;
     std::string _body;
-    std::string _serverName;
     bool _keepAlive;
     bool _headResponse;
     bool _chunkedFinished;
