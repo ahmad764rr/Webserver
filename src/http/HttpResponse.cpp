@@ -477,6 +477,9 @@ bool HttpResponse::buildHeadersBlock() {
     _totalBytesSent = 0;
 
     _headers["connection"] = _keepAlive ? "keep-alive" : "close";
+    _headers["access-control-allow-origin"] = "*";
+    _headers["access-control-allow-methods"] = "GET, POST, DELETE, OPTIONS";
+    _headers["access-control-allow-headers"] = "*";
     if (!_headers.count("date")) {
         _headers["date"] = formatHttpDate();
     }

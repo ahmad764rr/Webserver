@@ -126,7 +126,7 @@ async function executeGet() {
 
 // Autoindex Test
 async function executeAutoIndex() {
-  const path = 'http://eval3.com:8081/'; // Points to the autoindex server from eval.conf
+  const path = 'http://' + window.location.hostname + ':8081/'; // Points to the autoindex server from eval.conf
   updateUrlBar(path);
   showSpinner('spinner-get');
   try {
@@ -274,7 +274,7 @@ async function testError(path, method) {
 }
 
 async function testPayloadTooLarge() {
-  const path = 'http://eval2.com:8080/'; // eval2.com has max_body_size 10
+  const path = 'http://' + window.location.hostname + ':8081/'; // Port 8081 has clientMaxBodySize = 10 in eval.conf
   updateUrlBar(path);
   document.getElementById('current-method').textContent = 'POST';
   try {
