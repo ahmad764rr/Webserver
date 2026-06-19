@@ -150,6 +150,10 @@ fileInput.addEventListener('change', (e) => {
   if (e.target.files.length > 0) {
     selectedFile = e.target.files[0];
     selectedFileName.textContent = `Selected: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(2)} KB)`;
+    const uploadPathInput = document.getElementById('upload-path');
+    if (uploadPathInput) {
+      uploadPathInput.value = `/upload/${selectedFile.name}`;
+    }
   }
 });
 
@@ -168,6 +172,10 @@ dropZone.addEventListener('drop', (e) => {
   if (e.dataTransfer.files.length > 0) {
     selectedFile = e.dataTransfer.files[0];
     selectedFileName.textContent = `Selected: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(2)} KB)`;
+    const uploadPathInput = document.getElementById('upload-path');
+    if (uploadPathInput) {
+      uploadPathInput.value = `/upload/${selectedFile.name}`;
+    }
   }
 });
 
