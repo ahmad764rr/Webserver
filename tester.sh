@@ -190,6 +190,7 @@ assert_contains "Has -Werror" "$MK" "Werror"
 assert_contains "Has -std=c++98" "$MK" "std=c++98"
 
 sub "2.4 No relinking (make && make)"
+make > /dev/null 2>&1
 RELINK=$(make 2>&1)
 assert_contains "'make' reports nothing to be done" "$RELINK" "Nothing to be done"
 
