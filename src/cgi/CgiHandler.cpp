@@ -52,19 +52,19 @@ CgiHandler& CgiHandler::operator=(const CgiHandler& other) {
 
 void CgiHandler::_clearArrays() {
     if (_env_array) {
-        for (int i = 0; _env_array[i]; i++) free(_env_array[i]);
-        free(_env_array);
+        for (int i = 0; _env_array[i]; i++) delete[] _env_array[i];
+        delete[] _env_array;
         _env_array = NULL;
     }
     if (_argv) {
-        for (int i = 0; _argv[i]; i++) free(_argv[i]);
-        free(_argv);
+        for (int i = 0; _argv[i]; i++) delete[] _argv[i];
+        delete[] _argv;
         _argv = NULL;
     }
 }
 
 char* CgiHandler::_strdup_safe(const std::string& str) {
-    char* res = (char*)malloc(str.length() + 1);
+    char* res = new char[str.length() + 1];
     if (!res) return NULL;
     std::strcpy(res, str.c_str());
     return res;
@@ -105,7 +105,7 @@ void CgiHandler::_setupEnvMap(HttpRequest& request) {
 }
 
 void CgiHandler::_convertEnvToCStyle() {
-    _env_array = (char**)malloc(sizeof(char*) * (_env_map.size() + 1));
+    _env_array = new char*[_env_map.size() + 1];
     if (!_env_array) return;
     
     int i = 0;
@@ -113,8 +113,8 @@ void CgiHandler::_convertEnvToCStyle() {
         std::string entry = it->first + "=" + it->second;
         _env_array[i] = _strdup_safe(entry);
         if (!_env_array[i]) {
-            while (--i >= 0) free(_env_array[i]);
-            free(_env_array);
+            while (--i >= 0) delete[] _env_array[i];
+            delete[] _env_array;
             _env_array = NULL;
             return;
         }
@@ -122,7 +122,7 @@ void CgiHandler::_convertEnvToCStyle() {
     }
     _env_array[i] = NULL;
 
-    _argv = (char**)malloc(sizeof(char*) * 3);
+    _argv = new char*[3];
     if (!_argv) return;
     
     _argv[0] = _strdup_safe(_interpreter_path);
@@ -133,9 +133,9 @@ void CgiHandler::_convertEnvToCStyle() {
     }
     _argv[1] = _strdup_safe(script_name);
     if (!_argv[0] || !_argv[1]) {
-        if (_argv[0]) free(_argv[0]);
-        if (_argv[1]) free(_argv[1]);
-        free(_argv);
+        if (_argv[0]) delete[] _argv[0];
+        if (_argv[1]) delete[] _argv[1];
+        delete[] _argv;
         _argv = NULL;
         return;
     }

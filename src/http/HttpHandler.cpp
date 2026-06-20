@@ -82,7 +82,10 @@ void handleUpload(ClientConnection& client, const std::vector<ServerConfig>& ser
     if (uploadTargetDir.empty()) uploadTargetDir = "./www/upload";
 
     struct stat st;
-    if (stat(uploadTargetDir.c_str(), &st) != 0) mkdir(uploadTargetDir.c_str(), 0755);
+    if (stat(uploadTargetDir.c_str(), &st) != 0) {
+        buildErrorResponse(client, servers, 500, "Upload directory does not exist");
+        return;
+    }
 
     std::string targetFile;
     const std::string& reqPath = client.request.getPath();
@@ -108,6 +111,27 @@ void handleUpload(ClientConnection& client, const std::vector<ServerConfig>& ser
 }
 
 void buildResponseForRequest(ClientConnection& client, const std::vector<ServerConfig>& servers) {
+    std::string host = client.request.getHeader("host");
+    std::size_t colonPos = host.find(':');
+    if (colonPos != std::string::npos) {
+        host = host.substr(0, colonPos);
+    }
+    
+    int port = servers[client.serverIndex].listenPort;
+    for (std::size_t i = 0; i < servers.size(); ++i) {
+        if (servers[i].listenPort == port) {
+            bool matched = false;
+            for (std::size_t j = 0; j < servers[i].serverNames.size(); ++j) {
+                if (servers[i].serverNames[j] == host) {
+                    client.serverIndex = i;
+                    matched = true;
+                    break;
+                }
+            }
+            if (matched) break;
+        }
+    }
+
     const ServerConfig& cfg = servers[client.serverIndex];
     const HttpRequest& request = client.request;
 
@@ -115,6 +139,12 @@ void buildResponseForRequest(ClientConnection& client, const std::vector<ServerC
     client.response.setVersion(request.getVersion());
     client.response.setKeepAlive(!connectionShouldClose(request));
     client.closeAfterSend = connectionShouldClose(request);
+
+    if (request.getErrorStatus() != 0) {
+        buildErrorResponse(client, servers, request.getErrorStatus(), request.getErrorMessage());
+        client.closeAfterSend = true;
+        return;
+    }
 
     if (request.getBody().size() > cfg.clientMaxBodySize) {
         buildErrorResponse(client, servers, 413, "Payload exceeds body storage restrictions");

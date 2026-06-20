@@ -24,6 +24,7 @@ struct ServerConfig {
     std::string root;
     std::size_t clientMaxBodySize;
     bool autoindex;
+    std::vector<std::string> serverNames;
     std::map<int, std::string> errorPages;
     std::map<std::string, std::string> cgiInterpreters;
     std::map<std::string, LocationConfig> locations;

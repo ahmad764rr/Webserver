@@ -62,15 +62,19 @@ void HttpRequest::reset() {
 }
 
 HttpRequest::ParseState HttpRequest::feed(const std::string& chunk) {
+    return feed(chunk.data(), chunk.size());
+}
+
+HttpRequest::ParseState HttpRequest::feed(const char* data, std::size_t len) {
     if (_state == COMPLETE || _state == ERROR) {
-        if (!chunk.empty()) {
-            _buffer.append(chunk);
+        if (len > 0) {
+            _buffer.append(data, len);
         }
         return _state;
     }
 
-    if (!chunk.empty()) {
-        _buffer.append(chunk);
+    if (len > 0) {
+        _buffer.append(data, len);
     }
 
     while (_state == READING_HEADERS || _state == READING_BODY) {
@@ -149,13 +153,18 @@ bool HttpRequest::parseRequestLine(const std::string& line) {
     _requestTarget = parts[1];
     _version = parts[2];
 
-    if (_method != "GET" && _method != "POST" && _method != "DELETE") {
-        setError(501, "unsupported method");
+    if (_version.length() < 5 || _version.substr(0, 5) != "HTTP/") {
+        setError(400, "malformed HTTP version");
         return false;
     }
 
     if (_version != "HTTP/1.1" && _version != "HTTP/1.0") {
         setError(505, "unsupported HTTP version");
+        return false;
+    }
+
+    if (_method != "GET" && _method != "POST" && _method != "DELETE") {
+        setError(501, "unsupported method");
         return false;
     }
 
@@ -263,6 +272,13 @@ bool HttpRequest::finalizeHeaders() {
         if (_contentLength == 0) {
             markComplete();
             return true;
+        }
+
+        try {
+            _body.reserve(_contentLength);
+        } catch (...) {
+            setError(500, "out of memory for body allocation");
+            return false;
         }
 
         _bodyMode = BODY_CONTENT_LENGTH;

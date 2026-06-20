@@ -27,6 +27,7 @@ public:
 
     void reset();
     ParseState feed(const std::string& chunk);
+    ParseState feed(const char* data, std::size_t len);
 
     ParseState getState() const;
     bool isComplete() const;

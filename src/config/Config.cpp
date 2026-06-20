@@ -164,6 +164,19 @@ bool ConfigParser::parseServerBlock(const std::vector<std::string>& tokens,
             continue;
         }
 
+        if (directive == "server_name") {
+            while (index < tokens.size() && tokens[index] != ";") {
+                cfg.serverNames.push_back(tokens[index++]);
+            }
+            if (index < tokens.size() && tokens[index] == ";") {
+                ++index;
+            } else {
+                error = "server_name directive must end with ';'";
+                return false;
+            }
+            continue;
+        }
+
         if (directive == "client_max_body_size") {
             if (index >= tokens.size()) {
                 error = "client_max_body_size requires a value";

@@ -35,6 +35,7 @@ struct ClientConnection {
     // File streaming for non-blocking large file downloads
     int sendFileFd;
     std::string sendFileBuf;
+    bool readEof;
 
     ClientConnection();
 };

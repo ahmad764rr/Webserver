@@ -16,7 +16,7 @@
 
 namespace {
 const int kBacklog = 128;
-const int kBufferSize = 8192;
+const int kBufferSize = 131072;
 
 bool setNonBlocking(int fd) {
     const int flags = fcntl(fd, F_GETFL, 0);
@@ -82,7 +82,8 @@ void WebServer::rebuildPollFds() {
         struct pollfd p; p.fd = it->first; p.events = POLLIN; p.revents = 0; _pollFds.push_back(p);
     }
     for (std::map<int, ClientConnection>::const_iterator it = _clients.begin(); it != _clients.end(); ++it) {
-        struct pollfd p; p.fd = it->first; p.events = POLLIN;
+        struct pollfd p; p.fd = it->first; p.events = 0;
+        if (!it->second.readEof) p.events |= POLLIN;
         if (it->second.hasResponse || it->second.sendFileFd != -1 || !it->second.sendFileBuf.empty()) p.events |= POLLOUT;
         p.revents = 0; _pollFds.push_back(p);
 
@@ -188,7 +189,7 @@ void WebServer::handleCgiWrite(int clientFd) {
     const ssize_t wrote = write(client.cgiTask.pipe_in_fd, body.data() + client.cgiTask.body_written, remaining);
     if (wrote > 0) {
         client.cgiTask.body_written += static_cast<std::size_t>(wrote);
-    } else if (wrote < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+    } else if (wrote < 0) {
         close(client.cgiTask.pipe_in_fd);
         client.cgiTask.pipe_in_fd = -1;
     }
@@ -207,9 +208,7 @@ void WebServer::handleCgiRead(int clientFd) {
     const ssize_t n = read(client.cgiTask.pipe_out_fd, buffer, sizeof(buffer));
     if (n > 0) {
         client.cgiTask.cgi_output.append(buffer, static_cast<std::size_t>(n));
-    } else if (n == 0) {
-        if (client.cgiTask.pipe_out_fd != -1) { close(client.cgiTask.pipe_out_fd); client.cgiTask.pipe_out_fd = -1; }
-    } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
+    } else {
         if (client.cgiTask.pipe_out_fd != -1) { close(client.cgiTask.pipe_out_fd); client.cgiTask.pipe_out_fd = -1; }
     }
 }
@@ -255,16 +254,25 @@ void WebServer::handleClientRead(int clientFd) {
     char buffer[kBufferSize];
     const ssize_t n = recv(clientFd, buffer, sizeof(buffer), 0);
     if (n < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) return;
         closeClient(clientFd);
         return;
     }
     if (n == 0) {
-        closeClient(clientFd);
+        client.readEof = true;
+        if (client.hasResponse) {
+            client.closeAfterSend = true;
+        } else {
+            closeClient(clientFd);
+        }
         return;
     }
 
-    client.request.feed(std::string(buffer, static_cast<std::size_t>(n)));
+    client.request.feed(buffer, static_cast<std::size_t>(n));
+
+    if (client.hasResponse) {
+        client.carryBuffer.append(client.request.releaseUnparsedBuffer());
+        return;
+    }
 
     if (client.request.hasError()) {
         int errCode = client.request.getErrorStatus() ? client.request.getErrorStatus() : 400;
@@ -276,7 +284,7 @@ void WebServer::handleClientRead(int clientFd) {
     }
 
     if (client.request.isComplete()) {
-        client.carryBuffer = client.request.releaseUnparsedBuffer();
+        client.carryBuffer.append(client.request.releaseUnparsedBuffer());
         HttpHandler::buildResponseForRequest(client, _servers);
         client.hasResponse = true;
     }
@@ -293,7 +301,6 @@ void WebServer::handleClientWrite(int clientFd) {
         if (!chunk.empty()) {
             const ssize_t n = send(clientFd, chunk.data(), chunk.size(), 0);
             if (n < 0) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) return;
                 closeClient(clientFd);
                 return;
             }
@@ -312,7 +319,6 @@ void WebServer::handleClientWrite(int clientFd) {
         if (!client.sendFileBuf.empty()) {
             const ssize_t n = send(clientFd, client.sendFileBuf.data(), client.sendFileBuf.size(), 0);
             if (n < 0) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) return;
                 closeClient(clientFd); return;
             }
             if (n == 0) { closeClient(clientFd); return; }
@@ -328,10 +334,6 @@ void WebServer::handleClientWrite(int clientFd) {
         if (r > 0) {
             const ssize_t n = send(clientFd, buf, static_cast<std::size_t>(r), 0);
             if (n < 0) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    client.sendFileBuf.assign(buf, static_cast<std::size_t>(r));
-                    return;
-                }
                 closeClient(clientFd); return;
             }
             if (n == 0) { closeClient(clientFd); return; }
@@ -369,7 +371,7 @@ void WebServer::handleClientWrite(int clientFd) {
             return;
         }
         if (client.request.isComplete()) {
-            client.carryBuffer = client.request.releaseUnparsedBuffer();
+            client.carryBuffer.append(client.request.releaseUnparsedBuffer());
             HttpHandler::buildResponseForRequest(client, _servers);
             client.hasResponse = true;
         }
